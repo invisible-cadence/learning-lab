@@ -1,0 +1,9 @@
+{
+  "api_key": "phc_nRekyTiNVhQqAeATW4cuERgf2LBpY2uFaREWb3hXq23K",
+  "event": "curl_test",
+  "distinct_id": "curl-test-user",
+  "properties": {
+    "source": "warm-up-4"
+  },
+  "timestamp": "2026-11-25T09:00:00Z"
+}

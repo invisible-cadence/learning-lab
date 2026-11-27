@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hello PostHog</title>
+
+  <script>
+    !function(t,e){var o,n,p,r;e.__SV||(window.posthog && window.posthog.__loaded)||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}p||((p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",p.onerror=function(){p=null},(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r));var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],Object.defineProperty(u,"toString",{configurable:!0,enumerable:!0,writable:!0,value:function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e}}),Object.defineProperty(u.people,"toString",{configurable:!0,enumerable:!0,writable:!0,value:function(){return u.toString(1)+".people (stub)"}}),o="init capture register register_once register_for_session unregister unregister_for_session getFeatureFlag getFeatureFlagResult isFeatureEnabled reloadFeatureFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSessionId getSurveys getActiveMatchingSurveys renderSurvey canRenderSurvey getNextSurveyStep identify setPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException loadToolbar get_property getSessionProperty createPersonProfile opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing clear_opt_in_out_capturing debug".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+    posthog.init('phc_nRekyTiNVhQqAeATW4cuERgf2LBpY2uFaREWb3hXq23K', {
+        api_host: 'https://eu.i.posthog.com',
+        defaults: '2026-08-30',
+        debug:true,
+        // Experiment 2: raised from the defaults (10 per second, burst of 100)
+        // rate_limiting: { events_per_second: 50, events_burst_limit: 600 }
+    }) </script>
+
+</head>
+<body>
+  <h1>Hello PostHog</h1>
+
+  <!-- Custom event: we choose the event name and its properties -->
+  <button onclick="posthog.capture('hello_clicked', { color: 'blue', source: 'warm-up' })">
+    Say hello (custom event)
+  </button>
+
+  <!-- No code at all: autocapture should record this click by itself -->
+  <button>
+    Plain button (autocapture)
+  </button>
+
+  <hr>
+  <h2>Step 2: People (fake data only)</h2>
+
+  <!-- Prints the current distinct_id in the Console -->
+  <button onclick="console.log('distinct_id is:', posthog.get_distinct_id())">
+    Who am I?
+  </button>
+
+  <!-- Fake login: link this browser to our own user ID and set person properties -->
+  <button onclick="posthog.identify('fake-user-1', { email: 'fake-user-1@example.com', plan: 'free' })">
+    Log in as fake-user-1
+  </button>
+
+  <!-- Experiment 1: a separate fake user whose "PII" we will delete -->
+  <button onclick="posthog.identify('pii-test-user-1', { email: 'pii-test-user-1@example.com', phone: '+353 00 000 0000' })">
+    Log in as pii-test-user-1 (Experiment 1)
+  </button>
+
+  <!-- Fake logout: forget the user and start a new anonymous ID -->
+  <button onclick="posthog.reset()">
+    Log out
+  </button>
+
+  <hr>
+  <h2>Experiment 2: Client rate limiting</h2>
+
+  <!-- Fires 500 capture calls as fast as possible, numbered so we can see which ones arrive -->
+  <button onclick="
+    for (let i = 1; i <= 500; i++) {
+      posthog.capture('rate_test', { n: i });
+    }
+    console.log('Finished calling capture 500 times');
+  ">
+    Fire 500 events
+  </button>
+
+  <h3>Fake video player</h3>
+  <!-- No real video file: a timer stands in for the player. It "plays" a 60-second video
+       at 4x speed (so it takes 15 real seconds) and fires a fake "timeupdate" 20 times a
+       second, like a busy player. Each mode tracks the same playback differently. -->
+  <p>Position: <span id="videoPos">0.0</span>s / 60s · capture calls this run: <span id="videoCalls">0</span></p>
+  <button onclick="playVideo('every_tick')">Play: capture every timeupdate</button>
+  <button onclick="playVideo('milestones')">Play: milestones only</button>
+  <button onclick="playVideo('throttled')">Play: throttled (max 1 per 5s of video)</button>
+  <button onclick="pauseVideo()">Pause</button>
+
+  <script>
+    const VIDEO_LENGTH = 60;     // seconds of "video"
+    const TICKS_PER_SECOND = 20; // fake timeupdate events per real second
+    const SPEED = 4;             // playback speed
+
+    let timer = null, position = 0, calls = 0, mode = null;
+    let milestonesSent = new Set(), lastThrottled = -Infinity;
+
+    function track(event, props) {
+      calls++;
+      document.getElementById('videoCalls').textContent = calls;
+      posthog.capture(event, { video_id: 'fake-video-1', mode, position: Math.round(position * 10) / 10, ...props });
+    }
+
+    function playVideo(newMode) {
+      pauseVideo();
+      mode = newMode; position = 0; calls = 0;
+      milestonesSent = new Set(); lastThrottled = -Infinity;
+      track('video_play');
+      timer = setInterval(onTimeUpdate, 1000 / TICKS_PER_SECOND);
+    }
+
+    function pauseVideo() {
+      if (!timer) return;
+      clearInterval(timer); timer = null;
+      track('video_pause');
+    }
+
+    function onTimeUpdate() {
+      position = Math.min(VIDEO_LENGTH, position + SPEED / TICKS_PER_SECOND);
+      document.getElementById('videoPos').textContent = position.toFixed(1);
+
+      if (mode === 'every_tick') {
+        track('video_timeupdate');
+      } else if (mode === 'milestones') {
+        for (const pct of [25, 50, 75, 100]) {
+          if (!milestonesSent.has(pct) && position >= VIDEO_LENGTH * pct / 100) {
+            milestonesSent.add(pct);
+            track('video_progress', { percent: pct });
+          }
+        }
+      } else if (mode === 'throttled') {
+        if (position - lastThrottled >= 5) {
+          lastThrottled = position;
+          track('video_heartbeat');
+        }
+      }
+
+      if (position >= VIDEO_LENGTH) {
+        clearInterval(timer); timer = null;
+        track('video_complete');
+      }
+    }
+  </script>
+
+</body>
+</html>
